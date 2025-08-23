@@ -20,13 +20,6 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USER }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # Ensure the Compose v2 plugin is present on all runner images
-      - name: Ensure Docker Compose v2
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y docker-compose-plugin
-          docker compose version
-
       # Start only the DB (compose `run` won't start dependencies)
       - name: Start DB
         run: docker compose up -d db
