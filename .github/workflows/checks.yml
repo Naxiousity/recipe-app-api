@@ -1,19 +1,44 @@
 name: Checks
-
 on: [push]
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test-lint:
     name: Test and lint
     runs-on: ubuntu-latest
+
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Login to Docker Hub
-        uses: docker/login-action@v1
+        uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USER }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Checkout
-        uses: actions/checkout@v2
-      - name: Test
-        run: docker-compose run --rm app sh -c "python manage.py wait_for_db && python manage.py test"
-      
+
+      # Ensure the Compose v2 plugin is present on all runner images
+      - name: Ensure Docker Compose v2
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y docker-compose-plugin
+          docker compose version
+
+      # Start only the DB (compose `run` won't start dependencies)
+      - name: Start DB
+        run: docker compose up -d db
+
+      - name: Build app image
+        run: docker compose build app
+
+      - name: Run tests
+        run: >
+          docker compose run --rm app
+          sh -c "python manage.py wait_for_db && python manage.py test"
+
+      - name: Teardown
+        if: always()
+        run: docker compose down -v
